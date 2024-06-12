@@ -3,16 +3,28 @@ package handlers
 import (
 	"Mongo-GoClient/database"
 	"Mongo-GoClient/models"
+	"Mongo-GoClient/services"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"reflect"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+type createOrderProductBody struct {
+	ProductId string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+}
+
+type createOrderRequestBody struct {
+	CustomerId string                   `json:"customer_id"`
+	Products   []createOrderProductBody `json:"products"`
+}
 
 const ORDER_COLLECTION string = "orders"
 const DISCOUNT_COLLECTION string = "discount"
@@ -143,5 +155,76 @@ func GetOrderById(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error encoding orders ,(order.go/encode)", http.StatusInternalServerError)
 		return
 	}
+
+}
+
+func CreateOrder(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only post request allowed!", http.StatusBadRequest)
+		return
+	}
+
+	var body_data createOrderRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body_data); err != nil {
+		http.Error(w, "Error in reading request body", http.StatusBadRequest)
+		return
+	}
+
+	if body_data.CustomerId == "" || len(body_data.Products) == 0 {
+		http.Error(w, "Incorrect request body", http.StatusBadRequest)
+		return
+	}
+
+	for _, product := range body_data.Products {
+
+		if len(product.ProductId) == 0 || reflect.TypeOf(product.Quantity) != reflect.TypeOf(int(0)) {
+			http.Error(w, "Incorrect products found", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var product_ids []string
+
+	for _, product := range body_data.Products {
+		product_ids = append(product_ids, product.ProductId)
+	}
+
+	product_detail_arr, err := services.GetProductsService(product_ids)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println(product_detail_arr)
+
+	// ctx := context.Background()
+
+	// ordersCol, err := database.GetCollection(ORDER_COLLECTION)
+	// if err != nil {
+	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// productsCol, err := database.GetCollection(PRODUCTS_COLLECTION)
+	// if err != nil {
+	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// shippingsCol, err := database.GetCollection(SHIPPING_COLLECTION)
+	// if err != nil {
+	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// discountsCol, err := database.GetCollection(DISCOUNT_COLLECTION)
+	// if err != nil {
+	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// fmt.Println(body_data)
 
 }
