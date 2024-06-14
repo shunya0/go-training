@@ -15,6 +15,7 @@ const DISCOUNT_COLLECTION string = "discount"
 const CUSTOMERS_COLLECTION string = "customers"
 const SHIPPING_COLLECTION string = "shipping"
 const PRODUCTS_COLLECTION string = "products"
+const INVENTORY_COLLECTION string = "inventory"
 
 func GetProductsService(product_id_arr_str []string) ([]models.Product, error) {
 	var product_id_arr_obj_id []primitive.ObjectID
@@ -58,6 +59,3 @@ func GetProductsService(product_id_arr_str []string) ([]models.Product, error) {
 
 	return products, nil
 }
-
-
-//

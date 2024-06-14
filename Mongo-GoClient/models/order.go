@@ -5,9 +5,9 @@ import (
 )
 
 type Items struct {
-	ProductId  string             `json:"product_id" bson:"product_id"`
-	Quantity   int64              `json:"quantity" bson:"quantity"`
-	Price      int64              `json:"price" bson:"price"`
+	ProductId  primitive.ObjectID `json:"product_id" bson:"product_id"`
+	Quantity   int                `json:"quantity" bson:"quantity"`
+	Price      int                `json:"price" bson:"price"`
 	DiscountId primitive.ObjectID `json:"discount_id" bson:"discount_id"`
 }
 type Order struct {

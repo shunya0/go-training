@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"reflect"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -31,6 +33,7 @@ const DISCOUNT_COLLECTION string = "discount"
 const CUSTOMERS_COLLECTION string = "customers"
 const SHIPPING_COLLECTION string = "shipping"
 const PRODUCTS_COLLECTION string = "products"
+const CUSTOMER_COLLECTION string = "customers"
 
 func getOrders(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
@@ -176,12 +179,26 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	customer_obj_id, err := primitive.ObjectIDFromHex(body_data.CustomerId)
+	if err != nil {
+		http.Error(w, "invalid customer id", http.StatusBadRequest)
+		return
+	}
+
 	for _, product := range body_data.Products {
 
 		if len(product.ProductId) == 0 || reflect.TypeOf(product.Quantity) != reflect.TypeOf(int(0)) {
 			http.Error(w, "Incorrect products found", http.StatusBadRequest)
 			return
 		}
+	}
+	customer_obj, err := services.GetSingleCustomerService(body_data.CustomerId)
+	fmt.Println(customer_obj)
+
+	fmt.Println(customer_obj[0].Name)
+	if err != nil || customer_obj[0].Name == "" {
+		http.Error(w, "customer id not found", http.StatusNotFound)
+		return
 	}
 
 	var product_ids []string
@@ -193,38 +210,86 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	product_detail_arr, err := services.GetProductsService(product_ids)
 	if err != nil {
 		fmt.Println(err)
-		http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
 		return
 	}
 
 	fmt.Println(product_detail_arr)
 
-	// ctx := context.Background()
+	discount_detail_arr, err := services.GetDiscountServices()
+	if err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+	fmt.Println(discount_detail_arr)
 
-	// ordersCol, err := database.GetCollection(ORDER_COLLECTION)
-	// if err != nil {
-	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
-	// 	return
-	// }
+	var items []models.Items
+	for _, product := range product_detail_arr {
+		var item models.Items
+		product_obj_id, err := primitive.ObjectIDFromHex(product.ID)
+		if err != nil {
+			http.Error(w, "something went wrong", http.StatusInternalServerError)
+			return
+		}
+		item.ProductId = product_obj_id
+		item.Price = int(product.Price)
+		random_discount_id, err := primitive.ObjectIDFromHex(discount_detail_arr[rand.Intn(len(discount_detail_arr))].ID)
+		if err != nil {
+			fmt.Println("error in getting random discount id", err)
+			http.Error(w, "something went wrong", http.StatusInternalServerError)
+			return
+		}
+		item.DiscountId = random_discount_id
+		for _, request_product := range body_data.Products {
+			if product.ID == request_product.ProductId {
+				item.Quantity = int(request_product.Quantity)
+				break
+			}
 
-	// productsCol, err := database.GetCollection(PRODUCTS_COLLECTION)
-	// if err != nil {
-	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
-	// 	return
-	// }
+		}
+		items = append(items, item)
+	}
 
-	// shippingsCol, err := database.GetCollection(SHIPPING_COLLECTION)
-	// if err != nil {
-	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
-	// 	return
-	// }
+	fmt.Println(items)
 
-	// discountsCol, err := database.GetCollection(DISCOUNT_COLLECTION)
-	// if err != nil {
-	// 	http.Error(w, "Error getting collections", http.StatusInternalServerError)
-	// 	return
-	// }
+	shipping_creation_output, err := services.CreateShippingDetailsService()
+	if err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
 
-	// fmt.Println(body_data)
+	if len(shipping_creation_output) == 0 {
+		fmt.Println("empty return from shipping service")
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println(shipping_creation_output)
+
+	if err := services.UpdateInventoryService(items); err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	var new_order models.Order
+	new_order.OrderDate = primitive.NewDateTimeFromTime(time.Now())
+	new_order.CustomerId = customer_obj_id
+	new_order.Status = "pending"
+	new_order.Items = items
+	new_order.ShippingID = shipping_creation_output[0]
+
+	order_creation_output, err := services.CreateOrderService(new_order)
+	if err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	if err := services.UpdateShippingOrderIdService(shipping_creation_output[0], order_creation_output[0]); err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintln(w, "order created successfully \norder id:", order_creation_output[0], "\nshipping id: ", shipping_creation_output[0])
 
 }
