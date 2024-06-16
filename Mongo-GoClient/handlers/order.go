@@ -28,17 +28,24 @@ type createOrderRequestBody struct {
 	Products   []createOrderProductBody `json:"products"`
 }
 
+type cancelOrderBody struct {
+	CustomerId string `json:"customer_id"`
+	OrderId    string `json:"order_id"`
+	ShippingId string `json:"shipping_id"`
+}
+
 const ORDER_COLLECTION string = "orders"
 const DISCOUNT_COLLECTION string = "discount"
 const CUSTOMERS_COLLECTION string = "customers"
 const SHIPPING_COLLECTION string = "shipping"
 const PRODUCTS_COLLECTION string = "products"
 const CUSTOMER_COLLECTION string = "customers"
+const BILL_COLLECTION string = "bill"
 
 func getOrders(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
-	col, err := database.GetCollection("orders")
+	col, err := database.GetCollection(ORDER_COLLECTION)
 	if err != nil {
 		http.Error(w, "failed to get collection (main.go/getOrders) ", http.StatusInternalServerError)
 		return
@@ -292,4 +299,60 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintln(w, "order created successfully \norder id:", order_creation_output[0], "\nshipping id: ", shipping_creation_output[0])
 
+}
+
+func CancelOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "only post request", http.StatusBadRequest)
+		return
+	}
+
+	var body_data_cancel_order cancelOrderBody
+	if err := json.NewDecoder(r.Body).Decode(&body_data_cancel_order); err != nil {
+		http.Error(w, "error in reading request body", http.StatusBadRequest)
+		return
+	}
+
+	if body_data_cancel_order.CustomerId == "" || body_data_cancel_order.OrderId == "" || body_data_cancel_order.ShippingId == "" {
+		http.Error(w, "incorrect request body", http.StatusBadRequest)
+		return
+	}
+	customer_obj_id, err := primitive.ObjectIDFromHex(body_data_cancel_order.CustomerId)
+	if err != nil {
+		http.Error(w, "invalid customer id", http.StatusBadRequest)
+		return
+	}
+
+	order_obj_id, err := primitive.ObjectIDFromHex(body_data_cancel_order.OrderId)
+	if err != nil {
+		http.Error(w, "invalid customer id", http.StatusBadRequest)
+		return
+	}
+
+	shipping_obj_id, err := primitive.ObjectIDFromHex(body_data_cancel_order.ShippingId)
+	if err != nil {
+		http.Error(w, "invalid customer id", http.StatusBadRequest)
+		return
+	}
+
+	shippment_cancel_err := services.CancelShippmentService(order_obj_id)
+	if shippment_cancel_err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	delete_shipping_err := services.DeleteShippmentService(shipping_obj_id)
+	if delete_shipping_err != nil {
+		http.Error(w, "something went wrong", http.StatusInternalServerError)
+		return
+	}
+
+	var order_canceled models.Cancel
+	order_canceled.CustomerID = customer_obj_id
+	order_canceled.OrderID = order_obj_id
+	order_canceled.ShippingID = shipping_obj_id
+	order_canceled.ShippingStatus = "Canceled!"
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "User: ", customer_obj_id, " has canceled order with id: ", order_obj_id)
 }

@@ -53,3 +53,53 @@ func UpdateShippingOrderIdService(shipping_id primitive.ObjectID, order_id primi
 
 	return nil
 }
+
+func DeleteShippmentService(shipping_id primitive.ObjectID) error {
+
+	ctx := context.Background()
+
+	shipping_col, err := database.GetCollection(SHIPPING_COLLECTION)
+	if err != nil {
+		fmt.Println("can not get shipping collection:(deleteShippmentService) ", err)
+		return fmt.Errorf("unable to fetch shipping collection: (deleteShippmentService) ")
+	}
+
+	cursor, err := shipping_col.DeleteOne(ctx, bson.D{{"_id", shipping_id}})
+	if err != nil {
+		fmt.Println("error deleting order id")
+		return fmt.Errorf("shipping id not deleted")
+
+	}
+	if cursor.DeletedCount == 0 {
+		fmt.Println("invalid user")
+		return fmt.Errorf("shipping id not deleted")
+	}
+	return nil
+}
+
+func GetShippingDetailsService(shipping_id primitive.ObjectID) ([]models.Shipping, error) {
+	ctx := context.Background()
+
+	shipping_col, err := database.GetCollection(SHIPPING_COLLECTION)
+	if err != nil {
+		fmt.Println("can not get shipping collection:(GetShippingDetailsService) ", err)
+		return nil, fmt.Errorf("unable to fetch shipping colleciton (GetShippingDetailsService)")
+	}
+
+	cursor, err := shipping_col.Find(ctx, bson.D{{"_id", shipping_id}})
+	if err != nil {
+		fmt.Println("can not find shipping services for this collection (GetShippingDetailsService)")
+		return nil, fmt.Errorf("shipping collection not found (GetShippingDetailsService)")
+	}
+
+	var shipping_details models.Shipping
+	for cursor.Next(ctx) {
+		err := cursor.Decode(&shipping_details)
+		if err != nil {
+			fmt.Println("unable to decode shipping detials(GetShippingDetailsService)")
+			return nil, fmt.Errorf("unable to show shipping details (GetShippingDetailsService)")
+		}
+	}
+
+	return []models.Shipping{shipping_details}, nil
+}

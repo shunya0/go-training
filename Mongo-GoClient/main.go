@@ -14,6 +14,8 @@ func main() {
 	http.HandleFunc("/orders", handlers.GetOrderById)
 	http.HandleFunc("/products", handlers.GetProducts)
 	http.HandleFunc("/createOrders", handlers.CreateOrder)
+	http.HandleFunc("/cancelOrder", handlers.CancelOrder)
+	http.HandleFunc("/billCreate", handlers.BillCreation)
 
 	fmt.Println("Starting Server at", port)
 
