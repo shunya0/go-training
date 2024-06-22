@@ -51,7 +51,34 @@ func CancelShippmentService(order_id primitive.ObjectID) error {
 	return nil
 }
 
-func GetOrderDetialsService(customer_id primitive.ObjectID) ([]models.Order, error) {
+func GetOrderDetialsService(order_id primitive.ObjectID) ([]models.Order, error) {
+	ctx := context.Background()
+
+	order_cols, err := database.GetCollection(ORDER_COLLECTION)
+	if err != nil {
+		fmt.Println("can not get Order collection:(GetOrderDetialsService) ", err)
+		return nil, fmt.Errorf("unable to fetch Order colleciton (GetOrderDetialsService)")
+	}
+
+	cursor, err := order_cols.Find(ctx, bson.D{{"_id", order_id}})
+	if err != nil {
+		fmt.Println("can not find Order services for this collection (GetOrderDetialsService)")
+		return nil, fmt.Errorf("Order collection not found (GetOrderDetialsService)")
+	}
+
+	var order_details models.Order
+	for cursor.Next(ctx) {
+		err := cursor.Decode(&order_details)
+		if err != nil {
+			fmt.Println("unable to decode order detials(GetOrderDetialsService)")
+			return nil, fmt.Errorf("unable to show order details (GetOrderDetialsService)")
+		}
+	}
+
+	return []models.Order{order_details}, nil
+}
+
+func GetOrderDetialsByCustomerIDService(customer_id primitive.ObjectID) ([]models.Order, error) {
 	ctx := context.Background()
 
 	order_cols, err := database.GetCollection(ORDER_COLLECTION)
@@ -63,7 +90,7 @@ func GetOrderDetialsService(customer_id primitive.ObjectID) ([]models.Order, err
 	cursor, err := order_cols.Find(ctx, bson.D{{"customer_id", customer_id}})
 	if err != nil {
 		fmt.Println("can not find Order services for this collection (GetOrderDetialsService)")
-		return nil, fmt.Errorf("Order collection not found (GetOrderDetialsService)")
+		return nil, fmt.Errorf("oder collection not found (GetOrderDetialsService)")
 	}
 
 	var order_details models.Order

@@ -21,3 +21,21 @@ type BillGen struct {
 	Address        UserAddress        `json:"address" bson:"address"`
 	Items          []ItemOrdered      `json:"orders" bson:"orders"`
 }
+
+//used for controllers
+
+type CreateBill struct {
+	CustomerId string               `json:"customer_id" bson:"customer_id" binding:"required,customer_id"`
+	Products   []ProductDetailsBill `json:"products"`
+}
+type ProductDetailsBill struct {
+	ProductId string `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+}
+
+type GetBill struct {
+	BillId string `json:"bill_id" bson:"bill_id" binding:"required,bill_id"`
+}
+type GetBillByCustomer struct {
+	CustomerID string `json:"customer_id" bson:"customer_id" binding:"required,customer_id"`
+}

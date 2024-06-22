@@ -50,9 +50,7 @@ func getOrders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to get collection (main.go/getOrders) ", http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(database.Client)
-
-	fmt.Println(col)
+	
 	cursor, err := col.Find(ctx, bson.M{})
 	if err != nil {
 		fmt.Println("Err", err)

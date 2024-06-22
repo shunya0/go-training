@@ -33,11 +33,14 @@ func GetSingleCustomerService(str string) ([]models.Customer, error) {
 		return nil, fmt.Errorf("no valid customer found")
 	}
 	var customer_details models.Customer
-	for cursor.Next(ctx) {
+	if cursor.Next(ctx) {
 		if err := cursor.Decode(&customer_details); err != nil {
 			fmt.Println("error decoding customer details")
 			return nil, fmt.Errorf("can not fetch customer details")
 		}
+	} else {
+		return []models.Customer{}, nil
+
 	}
 	fmt.Println(customer_details)
 	return []models.Customer{customer_details}, nil

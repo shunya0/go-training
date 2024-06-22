@@ -61,3 +61,32 @@ func GetProductsService(product_id_arr_str []string) ([]models.Product, error) {
 
 	return products, nil
 }
+
+func GetSingleProductDetailService(product_id_str string) ([]models.Product, error) {
+	ctx := context.Background()
+
+	productCol, err := database.GetCollection(PRODUCTS_COLLECTION)
+	if err != nil {
+		return nil, fmt.Errorf("error geting collections")
+	}
+
+	filter := bson.M{"_id": bson.D{{"$in", product_id_str}}}
+	cursor, err := productCol.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching products")
+	}
+
+	var products []models.Product
+	for cursor.Next(ctx) {
+		var product models.Product
+
+		err := cursor.Decode(&product)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding cursor")
+		}
+
+		products = append(products, product)
+	}
+
+	return products, nil
+}
