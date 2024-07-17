@@ -3,6 +3,7 @@ package main
 import (
 	"Mongo-GoClient/controllers"
 	"Mongo-GoClient/database"
+	"Mongo-GoClient/middleware"
 	"Mongo-GoClient/validators"
 	"context"
 
@@ -43,11 +44,15 @@ func main() {
 			"message": "pong",
 		})
 	})
-	r.GET("/login", controllers.Login)
+	r.POST("/register", controllers.Register)
+	r.POST("/login", controllers.Login)
+	r.GET("/valid", middleware.AuthMiddleware, controllers.Validate)
 	r.GET("/logout", controllers.Logout)
 	r.GET("/orders", controllers.SessionMiddleware, controllers.GetUserOrders)
 	r.POST("/orders", controllers.CreateOrder)
 	r.DELETE("/orders", controllers.CancelOrder)
+
+	r.POST("/send-email", controllers.SendEmail)
 
 	r.GET("/bill", controllers.GetBillCustomerId)
 	r.POST("/bill", controllers.BillCreation)

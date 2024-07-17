@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"Mongo-GoClient/models"
+	"Mongo-GoClient/services"
 	"Mongo-GoClient/utils"
 	"crypto/rand"
 	"encoding/base64"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 )
 
 type session struct {
@@ -35,7 +38,7 @@ func createSession(userID string) (string, error) {
 	return sessionID, nil
 }
 
-func getSession(sessionID string) (session, bool) {
+func GetSession(sessionID string) (session, bool) {
 	sess, exists := Sessions[sessionID]
 	if !exists || sess.expiry < time.Now().Unix() {
 		return session{}, false
@@ -48,9 +51,53 @@ func invalidSession(sessionID string) {
 }
 
 func Login(c *gin.Context) {
-	customer_id_str := c.Request.URL.Query().Get("customer_id")
-	utils.CUSTOMER_LOGGED = customer_id_str
-	session_id, err := createSession(customer_id_str)
+	var json models.LoginUser
+
+	if err := c.ShouldBindJSON(&json); err != nil {
+		fmt.Println("json")
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "something went wrong",
+		})
+
+		return
+	}
+
+	userExistsBool, err := services.CheckUserExistsService(json)
+	if userExistsBool == false && err != nil {
+		fmt.Println("error userExistsBool: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "user not found",
+		})
+		return
+	}
+
+	userValidBool, err := services.UserValid(json)
+	if userValidBool == false || err != nil {
+		fmt.Println("error userValid: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "incorrect email/password",
+		})
+		return
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":  json.Email,
+		"expt": time.Now().Add(utils.SessionDuration * time.Second).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(utils.SECRET_KEY_TOKEN))
+
+	if err != nil {
+		fmt.Println("error getting token: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "something went wrong",
+		})
+		return
+	}
+
+	session_id, err := createSession(tokenString)
 	if err != nil {
 		fmt.Println("can not create session")
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -59,7 +106,7 @@ func Login(c *gin.Context) {
 		c.Abort()
 		return
 	}
-
+	
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:    "session_id",
 		Value:   session_id,
@@ -67,6 +114,7 @@ func Login(c *gin.Context) {
 	})
 	c.Writer.WriteHeader(http.StatusOK)
 	fmt.Fprintln(c.Writer, "User logged in successfully")
+
 }
 
 func Logout(c *gin.Context) {
@@ -101,7 +149,7 @@ func SessionMiddleware(c *gin.Context) {
 	}
 
 	sessionID := cookie.Value
-	sess, valid := getSession(sessionID)
+	sess, valid := GetSession(sessionID)
 	if !valid {
 		fmt.Println("not Authorized")
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -113,4 +161,34 @@ func SessionMiddleware(c *gin.Context) {
 	c.Request.Header.Set("user_id", sess.userID)
 	c.Next()
 
+}
+
+func Register(c *gin.Context) {
+	var json models.RegisterUser
+	if err := c.ShouldBindJSON(&json); err != nil {
+		fmt.Println("error: json", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "something went wrong",
+		})
+		return
+	}
+	json.Role = "customer"
+	user_id, err := services.CreateUser(json)
+	if err != nil {
+		fmt.Println("creating user_id: ", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "user with username or mail already exists",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
+	fmt.Fprintln(c.Writer, "User created with ID: ", user_id)
+
+}
+
+func Validate(c *gin.Context) {
+	user, _ := c.Get("user")
+	c.JSON(http.StatusOK, gin.H{
+		"user": user,
+	})
 }
